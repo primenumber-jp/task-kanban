@@ -1,7 +1,10 @@
 'use client'
 
 import { useState } from 'react'
+import { Pencil, Trash2 } from 'lucide-react'
 import TaskForm from '@/components/TaskForm'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import type { Task, TaskInput } from '@/lib/tasks/types'
 
 type TaskCardProps = {
@@ -9,6 +12,11 @@ type TaskCardProps = {
   onUpdate: (id: string, values: TaskInput) => Promise<boolean>
   onDelete: (id: string) => Promise<void>
 }
+
+const dateFormatter = new Intl.DateTimeFormat('ja-JP', {
+  month: 'short',
+  day: 'numeric',
+})
 
 export default function TaskCard({ task, onUpdate, onDelete }: TaskCardProps) {
   const [isEditing, setIsEditing] = useState(false)
@@ -28,50 +36,68 @@ export default function TaskCard({ task, onUpdate, onDelete }: TaskCardProps) {
   }
 
   return (
-    <article
-      aria-label={task.title}
-      className="rounded-lg border border-zinc-200 bg-white p-3 shadow-sm dark:border-zinc-800 dark:bg-zinc-950"
-    >
+    <article aria-label={task.title}>
       {isEditing ? (
-        <TaskForm
-          label={`「${task.title}」を編集`}
-          submitLabel="保存"
-          showStatus
-          initialValues={{
-            title: task.title,
-            description: task.description,
-            status: task.status,
-          }}
-          onSubmit={handleUpdate}
-          onCancel={() => setIsEditing(false)}
-        />
+        <Card className="ring-2 ring-ring/40">
+          <CardContent>
+            <TaskForm
+              label={`「${task.title}」を編集`}
+              submitLabel="保存"
+              showStatus
+              initialValues={{
+                title: task.title,
+                description: task.description,
+                status: task.status,
+              }}
+              onSubmit={handleUpdate}
+              onCancel={() => setIsEditing(false)}
+            />
+          </CardContent>
+        </Card>
       ) : (
-        <>
-          <h3 className="font-medium break-words">{task.title}</h3>
-          {task.description && (
-            <p className="mt-1 whitespace-pre-wrap text-sm text-zinc-600 dark:text-zinc-400">
-              {task.description}
-            </p>
-          )}
-          <div className="mt-2 flex gap-2 text-sm">
-            <button
-              type="button"
-              onClick={() => setIsEditing(true)}
-              disabled={isDeleting}
-              className="rounded border border-zinc-300 px-2 py-0.5 disabled:opacity-50 dark:border-zinc-700"
-            >
-              編集
-            </button>
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="rounded border border-red-300 px-2 py-0.5 text-red-600 disabled:opacity-50"
-            >
-              削除
-            </button>
-          </div>
-        </>
+        <Card
+          size="sm"
+          className="transition-shadow hover:shadow-md data-[deleting=true]:opacity-60"
+          data-deleting={isDeleting}
+        >
+          <CardHeader>
+            <CardTitle className="break-words">{task.title}</CardTitle>
+            {task.description && (
+              <CardDescription className="whitespace-pre-wrap break-words">
+                {task.description}
+              </CardDescription>
+            )}
+          </CardHeader>
+          <CardContent className="flex items-center justify-between gap-2">
+            <time dateTime={task.created_at} className="text-xs text-muted-foreground">
+              {dateFormatter.format(new Date(task.created_at))}
+            </time>
+            <div className="flex gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsEditing(true)}
+                disabled={isDeleting}
+                className="text-muted-foreground"
+              >
+                <Pencil />
+                編集
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              >
+                <Trash2 />
+                削除
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       )}
     </article>
   )
