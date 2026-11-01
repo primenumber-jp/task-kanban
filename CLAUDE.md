@@ -13,11 +13,33 @@ Next.js + Supabaseで構築し、Vercelにデプロイする。
 - Vercel（デプロイ）
 
 ## ディレクトリ構成
+```
 src/
-└── app/ # ページとレイアウト
-├── page.tsx # トップページ
-├── layout.tsx # 共通レイアウト
-└── globals.css # グローバルスタイル
+├── app/                    # ページとレイアウト
+│   ├── page.tsx            # トップページ
+│   ├── layout.tsx          # 共通レイアウト
+│   └── globals.css         # グローバルスタイル
+├── lib/supabase/           # Supabase関連
+│   ├── env.ts              # 環境変数の読み込み・未設定チェック
+│   ├── client.ts           # クライアントコンポーネント用クライアント
+│   ├── server.ts           # サーバー用クライアント（cookie対応）
+│   └── checkConnection.ts  # 接続確認（/auth/v1/health）
+└── instrumentation.ts      # サーバー起動時の処理（Supabase接続確認）
+__tests__/                  # テスト
+```
+
+## Supabase
+- プロジェクト: `task-kanban`（ID: `sjjdbvckbzphtzvvcybl`、リージョン: ap-northeast-1）。詳細はSupabase MCPで確認してください
+- パッケージ: `@supabase/supabase-js` と `@supabase/ssr` を使用しています
+- 環境変数: キーは `.env.example` を参照し、実際の値は `.env.local` に記載します（`.env*` はgit管理外）
+  - `NEXT_PUBLIC_SUPABASE_URL`
+  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`（`sb_publishable_...` 形式のPublishable key）
+- 環境変数は直接 `process.env` から読まず、`getSupabaseEnv()`（`src/lib/supabase/env.ts`）を経由してください
+- クライアントの使い分け:
+  - Server Component / Route Handler / Server Action: `src/lib/supabase/server.ts` の `createClient()`（async なので `await` が必要）
+  - クライアントコンポーネント: `src/lib/supabase/client.ts` の `createClient()`
+- 起動時の接続確認: `src/instrumentation.ts` がサーバー起動時に接続を確認し、失敗時のみ `console.error` で `[Supabase] 接続失敗: ...` を出力します（成功時は出力しません）
+- テストではSupabaseへの通信（`fetch` など）をモック化し、環境変数は `vi.stubEnv` で設定してください
 
 ## 開発コマンド
 - npm run dev: 開発サーバー起動（http://localhost:3000）
