@@ -9,6 +9,7 @@ Next.js + Supabaseで構築し、Vercelにデプロイする。
 - Next.js（App Router）
 - TypeScript
 - Supabase（データベース）
+- Tailwind CSS v4 + shadcn/ui（Base UI ベース、style: `base-nova`）
 - Vitest + Testing Library + user-event（テスト）
 - Vercel（デプロイ）
 
@@ -27,7 +28,9 @@ src/
 ├── components/             # UIコンポーネント
 │   ├── TaskBoard.tsx       # カンバン本体（取得・追加・編集・削除とstate管理）
 │   ├── TaskCard.tsx        # タスクカード（表示/編集切替、削除確認）
-│   └── TaskForm.tsx        # 追加・編集共用フォーム
+│   ├── TaskForm.tsx        # 追加・編集共用フォーム
+│   └── ui/                 # shadcn/uiのコンポーネント（CLIで追加）
+├── lib/utils.ts            # `cn`（クラス名結合）の再エクスポート
 ├── lib/supabase/           # Supabase関連
 │   ├── env.ts              # 環境変数の読み込み・未設定チェック
 │   ├── client.ts           # クライアントコンポーネント用クライアント
@@ -41,6 +44,56 @@ src/
 __tests__/                  # テスト
 └── helpers/fakeSupabase.ts # テスト用のインメモリSupabase
 ```
+
+## shadcn/ui
+- 設定は `components.json`（style: `base-nova`、ベースカラー: neutral、アイコン: lucide、CSS変数でテーマ管理）
+- コンポーネントの追加は `npx shadcn@latest add <名前>` で行い、`src/components/ui/` に生成されます。手順やAPIはContext7 MCPで最新ドキュメントを確認してください
+- プリミティブは Radix UI ではなく Base UI（`@base-ui/react`）です。ドキュメントやサンプルは Base UI 版を参照してください
+- `cn` は npm パッケージ `cn` から提供され、`src/lib/utils.ts` で再エクスポートしています
+- Tailwind は PostCSS ではなく `next.config.ts` の Turbopack ローダー（`@tailwindcss/turbopack`）で読み込んでいます。`postcss.config.*` は作らないでください
+- テーマの色・角丸は `src/app/globals.css` の CSS変数（`:root` / `.dark`）で管理しています。色は `bg-primary` や `text-muted-foreground` などのテーマトークンを使ってください
+- フォントは `layout.tsx` の Geist（`--font-geist-sans`）を `--font-sans` に割り当てています。`shadcn init` や `add` が `globals.css` を書き換えた場合は、`--font-sans: var(--font-sans)` のような自己参照になっていないか確認してください
+- ダークモードは `.dark` クラス方式（`@custom-variant dark`）です。切り替えの仕組みは未実装のため、現状はOSがダークでもライト表示になります
+- 導入済みのコンポーネント: button / card / input / textarea / label / native-select / badge / alert
+
+## デザインルール
+`TaskBoard` / `TaskCard` / `TaskForm` / `page.tsx` は shadcn/ui で構成しています。UIを追加・変更する際は以下に従ってください。
+
+### 基本方針
+- UI部品はまず `src/components/ui/` の shadcn/ui コンポーネントを使い、素の `<button>` / `<input>` などに Tailwind を直接書かないでください。必要な部品がなければ `npx shadcn@latest add` で追加します
+- `src/components/ui/` の生成ファイルは原則編集せず、見た目の調整は使う側の `className` で行ってください
+- 色はテーマトークン（`bg-card`・`bg-muted`・`text-muted-foreground`・`text-destructive`・`ring-foreground/10` など）のみ使い、`zinc-*`・`red-*` などのパレット色や16進カラーを直接書かないでください
+- 配色はneutralのモノトーンを基調にしています。ステータスは色ではなくアイコンで区別します（Todo: `Circle`、In Progress: `CircleDashed`、Done: `CircleCheck`。`TaskBoard.tsx` の `statusIcons`）
+- アイコンは `lucide-react` を使い、装飾目的のアイコンには `aria-hidden="true"` を付けてください。ボタンはアイコンだけにせず、テキストも並べます（例: `<Pencil />編集`）
+
+### レイアウト
+- ページは `max-w-7xl` の中央寄せ、背景は `body` の `bg-muted/30`、カードやフォームは `bg-card` で一段明るく見せます
+- `lg` 以上は「左に追加フォーム（`18rem`、`sticky`）＋右に3列」、`md` は「フォームを上に置き、その下に3列」、それより狭い画面は1列です。スマホ幅（390px程度）でも崩れないようにしてください
+- 列は `rounded-xl bg-muted/60 p-3` の `section` で、ヘッダーはステータスアイコン・`h2`・件数の `Badge` の順に並べます
+- 空状態は破線の枠（`border-dashed`）＋ `text-muted-foreground` で表示します
+
+### コンポーネントの使い分け
+| 用途 | 使うもの |
+|---|---|
+| タスクカード・追加フォームの枠 | `Card`（カードは `size="sm"`、編集中は `ring-2 ring-ring/40` で強調） |
+| 主要な操作（追加・保存） | `Button`（`variant="default"`） |
+| 補助的な操作（編集・キャンセル） | `Button`（`variant="ghost"`、カード内は `size="sm"`） |
+| 危険な操作（削除） | `ghost` ＋ `text-muted-foreground hover:bg-destructive/10 hover:text-destructive`（普段は控えめにし、ホバーで赤くする） |
+| 入力欄 | `Label` ＋ `Input` / `Textarea`。ラベルと入力欄は `flex flex-col gap-2` でまとめ、フィールド同士は `gap-4` |
+| ステータスの選択 | `NativeSelect`（テストの `user.selectOptions` がネイティブの `<select>` を前提にしているため、Base UI の `Select` は使わない） |
+| 件数 | `Badge`（`variant="secondary"`、`tabular-nums`） |
+| 通信エラー | `Alert variant="destructive"` ＋ `CircleAlert` アイコン ＋ `AlertDescription`（`AlertTitle` は付けない） |
+| 入力のエラー | 入力欄の直下に `<p role="alert" className="text-xs text-destructive">`、入力欄に `aria-invalid` と `aria-describedby` |
+| 読み込み中 | `Loader2`（`animate-spin`）＋「読み込み中...」 |
+
+### 実装上の注意（テストとの関係）
+- テストが使っている role・アクセシブルネーム（`article`・`region`・`form` の名前、ボタン名、ラベル名、表示文言）を変えないでください
+- shadcn/ui の `Card` は `div` を描画するため、タスクカードは `<article aria-label={タイトル}>` で `Card` を包んでいます
+- 列の名前は `h2` から付く（`aria-labelledby`）ため、件数の `Badge` など他の要素は `h2` の外に置いてください（中に入れると名前が「Todo 1」のようになります）
+- テストは `role="alert"` の `textContent` をメッセージと完全一致で比較しています。`Alert` にはテキストを持つ要素を追加しないでください
+- Base UI の `Button` は既定で `type="button"` になります。送信ボタンには `type="submit"` を明示してください
+- 削除確認はブラウザ標準の `window.confirm` を使います（`AlertDialog` には置き換えていません）
+- 画面のデザインを変えたら、Playwright MCP で PC幅とスマホ幅のスクリーンショットを撮って確認してください
 
 ## Supabase
 - プロジェクト: `task-kanban`（ID: `sjjdbvckbzphtzvvcybl`、リージョン: ap-northeast-1）。詳細はSupabase MCPで確認してください
@@ -86,6 +139,7 @@ __tests__/                  # テスト
 
 ### 未実装・既知の制約
 - 認証（ユーザーごとのタスク分離）
+- ダークモードの切り替え（shadcn/ui の `.dark` クラス方式に対応する仕組みがありません）
 - ドラッグ&ドロップでのステータス変更、列内の並び替え（現在は作成日時の昇順）
 - リアルタイム同期（他のタブ・端末での変更は再読み込みするまで反映されません）
 
